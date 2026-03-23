@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Resources | Central Login</title>
+    <style>
+        :root { --accent: #007bff; --bg: #ffffff; --text: #333; --dark-bg: #0a0a0c; --game-accent: #00f2ff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body, html { height: 100%; overflow: hidden; background: var(--bg); }
+
+        /* --- THE DECOY (SCHOOL SIDE) --- */
+        #school-portal { display: flex; flex-direction: column; height: 100%; }
+        .nav { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .nav h1 { font-size: 1.2rem; color: #444; }
+        #search-box { padding: 8px; width: 300px; border: 1px solid #ccc; border-radius: 4px; }
+        .content { padding: 40px; display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .box { border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; background: white; }
+        .skeleton { height: 15px; background: #eee; margin-bottom: 10px; border-radius: 4px; }
+
+        /* --- THE VAULT (GAME SIDE) --- */
+        #vault { display: none; background: var(--dark-bg); color: white; height: 100%; flex-direction: column; }
+        .vault-header { padding: 15px 30px; background: #16161a; display: flex; justify-content: space-between; border-bottom: 1px solid #333; }
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; padding: 40px; overflow-y: auto; }
+        .game-card { background: #1c1c21; border-radius: 12px; padding: 20px; transition: 0.3s; cursor: pointer; border: 1px solid #333; position: relative; overflow: hidden; }
+        .game-card:hover { transform: translateY(-5px); border-color: var(--game-accent); box-shadow: 0 0 20px rgba(0, 242, 255, 0.2); }
+        .game-card h3 { color: var(--game-accent); margin-bottom: 10px; }
+        
+        /* --- GAME ENGINE OVERLAY --- */
+        #game-container { display: none; position: fixed; inset: 0; background: #000; z-index: 100; flex-direction: column; align-items: center; }
+        canvas { background: #000; box-shadow: 0 0 50px rgba(0,0,0,0.5); image-rendering: pixelated; }
+        .ui-layer { position: absolute; top: 20px; left: 20px; pointer-events: none; color: var(--game-accent); font-family: monospace; font-size: 20px; }
+        .panic-btn { position: fixed; bottom: 20px; right: 20px; padding: 10px 20px; background: #ff4757; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; z-index: 1000; }
+    </style>
+</head>
+<body>
+
+    <div id="school-portal">
+        <div class="nav">
+            <h1>EduFlow | Student Dashboard</h1>
+            <input type="text" id="search-box" placeholder="Search library database...">
+        </div>
+        <div class="content">
+            <div class="box">
+                <h3>Assigned Reading: "Modern History"</h3>
+                <div class="skeleton" style="width: 90%"></div>
+                <div class="skeleton" style="width: 80%"></div>
+                <div class="skeleton" style="width: 95%"></div>
+                <br>
+                <h3>Research Paper Guidelines</h3>
+                <div class="skeleton" style="width: 40%"></div>
+                <div class="skeleton" style="width: 60%"></div>
+            </div>
+            <div class="box">
+                <h3>Announcements</h3>
+                <p style="font-size: 0.9rem; color: #666;">• Math finals moved to Friday.</p>
+                <p style="font-size: 0.9rem; color: #666;">• Science lab safety quiz due tonight.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="vault">
+        <div class="vault-header">
+            <h2>SYSTEM OVERRIDE: ACTIVE</h2>
+            <span id="clock">00:00:00</span>
+        </div>
+        <div class="game-grid">
+            <div class="game-card" onclick="launch('STARFIELD')">
+                <h3>🚀 Star-Fighter</h3>
+                <p>Vector-based space combat. Destroy the geometric anomalies.</p>
+            </div>
+            <div class="game-card" onclick="launch('CLIMBER')">
+                <h3>🧗 Neon Climber</h3>
+                <p>Infinite physics-based platformer. Don't fall into the void.</p>
+            </div>
+            <div class="game-card" onclick="launch('DOOM')">
+                <h3>👁️ Cyber-Crawl 3D</h3>
+                <p>Raycasted 3D dungeon engine. Find the exit.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div class="ui-layer" id="game-ui">Score: 0</div>
+        <canvas id="mainCanvas"></canvas>
+        <button class="panic-btn" onclick="killSwitch()">PANIC (ESC)</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const search = document.getElementById('search-box');
+        let activeLoop = null;
+        let score = 0;
+
+        // --- AUTH LOGIC ---
+        search.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && search.value.toLowerCase() === 'gametime') {
+                document.getElementById('school-portal').style.display = 'none';
+                document.getElementById('vault').style.display = 'flex';
+                search.value = "";
+            }
+        });
+
+        function killSwitch() {
+            cancelAnimationFrame(activeLoop);
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('vault').style.display = 'none';
+            document.getElementById('school-portal').style.display = 'flex';
+        }
+
+        window.addEventListener('keydown', e => { if(e.key === 'Escape') killSwitch(); });
+
+        // --- GAME SELECTOR ---
+        function launch(game) {
+            document.getElementById('game-container').style.display = 'flex';
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            score = 0;
+            if (game === 'STARFIELD') startStarfield();
+            if (game === 'CLIMBER') startClimber();
+            if (game === 'DOOM') startDoom();
+        }
+
+        // --- GAME 1: STAR-FIGHTER (Vector Engine) ---
+        function startStarfield() {
+            let ship = { x: canvas.width/2, y: canvas.height/2, r: 15, rot: 0, v: {x:0, y:0} };
+            let bullets = [];
+            let enemies = [];
+            let keys = {};
+
+            function spawnEnemy() {
+                enemies.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, size: 20 + Math.random()*20, v: {x: Math.random()-0.5, y: Math.random()-0.5} });
+            }
+
+            window.onkeydown = e => keys[e.code] = true;
+            window.onkeyup = e => keys[e.code] = false;
+
+            function loop() {
+                ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width, canvas.height);
+                
+                // Ship Physics
+                if(keys['ArrowLeft']) ship.rot -= 0.1;
+                if(keys['ArrowRight']) ship.rot += 0.1;
+                if(keys['ArrowUp']) {
+                    ship.v.x += Math.cos(ship.rot) * 0.2;
+                    ship.v.y += Math.sin(ship.rot) * 0.2;
+                }
+                if(keys['Space'] && bullets.length < 10) {
+                    bullets.push({x: ship.x, y: ship.y, vx: Math.cos(ship.rot)*8, vy: Math.sin(ship.rot)*8, life: 60});
+                    keys['Space'] = false; // Debounce
+                }
+
+                ship.x += ship.v.x; ship.y += ship.v.y;
+                ship.v.x *= 0.98; ship.v.y *= 0.98;
+
+                // Wrap around
+                if(ship.x > canvas.width) ship.x = 0; if(ship.x < 0) ship.x = canvas.width;
+                if(ship.y > canvas.height) ship.y = 0; if(ship.y < 0) ship.y = canvas.height;
+
+                // Draw Ship
+                ctx.strokeStyle = '#00f2ff'; ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(ship.x + Math.cos(ship.rot)*20, ship.y + Math.sin(ship.rot)*20);
+                ctx.lineTo(ship.x + Math.cos(ship.rot+2.5)*15, ship.y + Math.sin(ship.rot+2.5)*15);
+                ctx.lineTo(ship.x + Math.cos(ship.rot-2.5)*15, ship.y + Math.sin(ship.rot-2.5)*15);
+                ctx.closePath(); ctx.stroke();
+
+                // Bullets
+                bullets.forEach((b, i) => {
+                    b.x += b.vx; b.y += b.vy; b.life--;
+                    ctx.fillStyle = '#fff'; ctx.fillRect(b.x, b.y, 2, 2);
+                    if(b.life <= 0) bullets.splice(i, 1);
+                });
+
+                // Enemies
+                if(Math.random() < 0.02) spawnEnemy();
+                enemies.forEach((en, i) => {
+                    en.x += en.v.x; en.y += en.v.y;
+                    ctx.strokeStyle = '#ff4757';
+                    ctx.strokeRect(en.x, en.y, en.size, en.size);
+                    
+                    bullets.forEach((b, bi) => {
+                        if(b.x > en.x && b.x < en.x+en.size && b.y > en.y && b.y < en.y+en.size) {
+                            enemies.splice(i, 1); bullets.splice(bi, 1);
+                            score += 10;
+                            document.getElementById('game-ui').innerText = "Score: " + score;
+                        }
+                    });
+                });
+
+                activeLoop = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        // --- GAME 2: NEON CLIMBER (Physics Engine) ---
+        function startClimber() {
+            let p = { x: 100, y: canvas.height-100, vy: 0, vx: 0, w: 20, h: 20 };
+            let platforms = [{x: 50, y: canvas.height-50, w: 200, h: 20}];
+            let cameraY = 0;
+            let keys = {};
+
+            window.onkeydown = e => keys[e.code] = true;
+            window.onkeyup = e => keys[e.code] = false;
+
+            function loop() {
+                ctx.fillStyle = '#050508'; ctx.fillRect(0,0,canvas.width, canvas.height);
+                
+                // Movement
+                if(keys['ArrowLeft']) p.vx = -5;
+                else if(keys['ArrowRight']) p.vx = 5;
+                else p.vx *= 0.8;
+
+                p.vy += 0.5; // Gravity
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Infinite Generation
+                while(platforms[platforms.length-1].y > cameraY) {
+                    platforms.push({
+                        x: Math.random()*(canvas.width-100),
+                        y: platforms[platforms.length-1].y - 120,
+                        w: 80 + Math.random()*100, h: 15
+                    });
+                }
+
+                // Collisions
+                platforms.forEach(plat => {
+                    if(p.vy > 0 && p.x + p.w > plat.x && p.x < plat.x + plat.w && 
+                       p.y + p.h > plat.y && p.y + p.h < plat.y + plat.h + p.vy) {
+                        p.y = plat.y - p.h;
+                        p.vy = -12; // Auto-jump
+                        score = Math.max(score, Math.floor(Math.abs(p.y - (canvas.height-100))/10));
+                        document.getElementById('game-ui').innerText = "Altitude: " + score;
+                    }
+                    ctx.fillStyle = '#00f2ff';
+                    ctx.fillRect(plat.x, plat.y - cameraY, plat.w, plat.h);
+                });
+
+                // Camera follow
+                if(p.y < cameraY + canvas.height/2) cameraY = p.y - canvas.height/2;
+
+                ctx.fillStyle = '#ff4757';
+                ctx.fillRect(p.x, p.y - cameraY, p.w, p.h);
+
+                if(p.y - cameraY > canvas.height) { alert("Fell into the void!"); killSwitch(); return; }
+
+                activeLoop = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        // --- GAME 3: CYBER-CRAWL (3D Raycaster Engine) ---
+        function startDoom() {
+            let player = { x: 2, y: 2, dir: 0 };
+            const map = [
+                [1,1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,0,1],
+                [1,0,1,0,1,1,0,1],
+                [1,0,1,0,0,0,0,1],
+                [1,0,0,0,1,0,0,1],
+                [1,0,1,0,1,1,0,1],
+                [1,0,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1,1],
+            ];
+            let keys = {};
+            window.onkeydown = e => keys[e.code] = true;
+            window.onkeyup = e => keys[e.code] = false;
+
+            function loop() {
+                ctx.fillStyle = '#111'; ctx.fillRect(0,0,canvas.width, canvas.height/2);
+                ctx.fillStyle = '#222'; ctx.fillRect(0,canvas.height/2,canvas.width, canvas.height/2);
+
+                if(keys['ArrowLeft']) player.dir -= 0.05;
+                if(keys['ArrowRight']) player.dir += 0.05;
+                if(keys['ArrowUp']) {
+                    let nx = player.x + Math.cos(player.dir)*0.05;
+                    let ny = player.y + Math.sin(player.dir)*0.05;
+                    if(map[Math.floor(ny)][Math.floor(nx)] === 0) { player.x = nx; player.y = ny; }
+                }
+
+                // Raycasting math
+                for(let i=0; i<canvas.width; i+=2) {
+                    let angle = (player.dir - 0.5) + (i/canvas.width);
+                    let dist = 0;
+                    let hit = false;
+                    while(!hit && dist < 15) {
+                        dist += 0.05;
+                        let rx = Math.floor(player.x + Math.cos(angle)*dist);
+                        let ry = Math.floor(player.y + Math.sin(angle)*dist);
+                        if(map[ry][rx] > 0) hit = true;
+                    }
+                    let h = canvas.height / (dist * Math.cos(angle - player.dir));
+                    ctx.fillStyle = `rgb(0, ${255 - dist*20}, ${255 - dist*10})`;
+                    ctx.fillRect(i, (canvas.height-h)/2, 2, h);
+                }
+                activeLoop = requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+        }, 1000);
+    </script>
+</body>
+</html>
